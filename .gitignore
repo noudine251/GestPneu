@@ -4,3 +4,4 @@ node_modules/
 Thumbs.db
 mes firebaseconfig.env.txt
 WhatsApp Image*.jpeg
+.claude/
