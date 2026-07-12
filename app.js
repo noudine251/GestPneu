@@ -38,11 +38,11 @@ const {
 } = LucideReact;
 
 /* ---------------------------------------------------------------------- */
-/*  KILS — Gestion boutique pneus d'occasion                              */
+/*  Kils Import/Export — Gestion boutique pneus d'occasion                */
 /* ---------------------------------------------------------------------- */
 
 const COMPANY = {
-  name: "KILS",
+  name: "Kils Import/Export",
   phone: "+237 670 05 28 57",
   location: "Bonabo, Douala — Cameroun"
 };
@@ -182,7 +182,7 @@ async function generateDocPDF(kind, record, customer) {
   y += 20;
   doc.setFontSize(8);
   doc.setTextColor(140);
-  doc.text("Merci pour votre confiance — KILS, pneus d'occasion.", 14, y);
+  doc.text("Merci pour votre confiance — Kils Import/Export, pneus d'occasion.", 14, y);
   doc.save(`${record.number}.pdf`);
 }
 
@@ -505,7 +505,7 @@ function App() {
       fontFamily: "'Barlow Condensed', sans-serif"
     },
     className: "text-3xl font-bold tracking-tight leading-none"
-  }, "KILS"), /*#__PURE__*/React.createElement("div", {
+  }, "Kils Import/Export"), /*#__PURE__*/React.createElement("div", {
     className: "text-[11px] text-stone-400 mt-1"
   }, "Gestion boutique — pneus d'occasion")), /*#__PURE__*/React.createElement(TreadRule, null), /*#__PURE__*/React.createElement("nav", {
     className: "flex-1 py-3"
@@ -681,7 +681,7 @@ function Login({
       fontFamily: "'Barlow Condensed', sans-serif"
     },
     className: "text-4xl font-bold text-neutral-900"
-  }, "KILS"), /*#__PURE__*/React.createElement("div", {
+  }, "Kils Import/Export"), /*#__PURE__*/React.createElement("div", {
     className: "text-sm text-stone-500 mt-1"
   }, "Gestion boutique — pneus d'occasion"), /*#__PURE__*/React.createElement(TreadRule, {
     className: "mt-4 rounded-full"
