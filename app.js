@@ -20,6 +20,7 @@ const {
   AlertTriangle,
   CheckCircle2,
   X,
+  Menu,
   LogOut,
   FileText,
   KeyRound,
@@ -371,6 +372,7 @@ const NAV = [{
 
 function App() {
   const [tab, setTab] = useState("dashboard");
+  const [navOpen, setNavOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
   const [products, setProducts] = useState([]);
@@ -387,25 +389,52 @@ function App() {
   const [invoices, setInvoices] = useState([]);
   useEffect(() => {
     const pending = new Set(Object.keys(KEYS));
-    const markLoaded = (k) => { pending.delete(k); if (pending.size === 0) setLoaded(true); };
-    const unsubs = [
-      subscribeC(KEYS.products, (d) => { setProducts(d); markLoaded("products"); }),
-      subscribeC(KEYS.suppliers, (d) => { setSuppliers(d); markLoaded("suppliers"); }),
-      subscribeC(KEYS.orders, (d) => { setOrders(d); markLoaded("orders"); }),
-      subscribeC(KEYS.moves, (d) => { setMoves(d); markLoaded("moves"); }),
-      subscribeC(KEYS.sales, (d) => { setSales(d); markLoaded("sales"); }),
-      subscribeC(KEYS.shipments, (d) => { setShipments(d); markLoaded("shipments"); }),
-      subscribeC(KEYS.accounts, (d) => {
-        setAccounts(d.length ? d : [{ id: uid(), name: "Caisse principale", initial: 0 }]);
-        markLoaded("accounts");
-      }),
-      subscribeC(KEYS.txns, (d) => { setTxns(d); markLoaded("txns"); }),
-      subscribeC(KEYS.customers, (d) => { setCustomers(d); markLoaded("customers"); }),
-      subscribeC(KEYS.users, (d) => { setUsers(d); markLoaded("users"); }),
-      subscribeC(KEYS.quotes, (d) => { setQuotes(d); markLoaded("quotes"); }),
-      subscribeC(KEYS.invoices, (d) => { setInvoices(d); markLoaded("invoices"); }),
-    ];
-    return () => unsubs.forEach((u) => u());
+    const markLoaded = k => {
+      pending.delete(k);
+      if (pending.size === 0) setLoaded(true);
+    };
+    const unsubs = [subscribeC(KEYS.products, d => {
+      setProducts(d);
+      markLoaded("products");
+    }), subscribeC(KEYS.suppliers, d => {
+      setSuppliers(d);
+      markLoaded("suppliers");
+    }), subscribeC(KEYS.orders, d => {
+      setOrders(d);
+      markLoaded("orders");
+    }), subscribeC(KEYS.moves, d => {
+      setMoves(d);
+      markLoaded("moves");
+    }), subscribeC(KEYS.sales, d => {
+      setSales(d);
+      markLoaded("sales");
+    }), subscribeC(KEYS.shipments, d => {
+      setShipments(d);
+      markLoaded("shipments");
+    }), subscribeC(KEYS.accounts, d => {
+      setAccounts(d.length ? d : [{
+        id: uid(),
+        name: "Caisse principale",
+        initial: 0
+      }]);
+      markLoaded("accounts");
+    }), subscribeC(KEYS.txns, d => {
+      setTxns(d);
+      markLoaded("txns");
+    }), subscribeC(KEYS.customers, d => {
+      setCustomers(d);
+      markLoaded("customers");
+    }), subscribeC(KEYS.users, d => {
+      setUsers(d);
+      markLoaded("users");
+    }), subscribeC(KEYS.quotes, d => {
+      setQuotes(d);
+      markLoaded("quotes");
+    }), subscribeC(KEYS.invoices, d => {
+      setInvoices(d);
+      markLoaded("invoices");
+    })];
+    return () => unsubs.forEach(u => u());
   }, []);
   useEffect(() => {
     if (loaded) saveC(KEYS.products, products);
@@ -496,25 +525,36 @@ function App() {
   const activeTab = visibleNav.some(n => n.id === tab) ? tab : "dashboard";
   return /*#__PURE__*/React.createElement(Shell, null, /*#__PURE__*/React.createElement("div", {
     className: "flex min-h-screen"
-  }, /*#__PURE__*/React.createElement("aside", {
-    className: "w-60 shrink-0 bg-neutral-900 text-white flex flex-col"
+  }, navOpen && /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-30 bg-black/40 md:hidden",
+    onClick: () => setNavOpen(false)
+  }), /*#__PURE__*/React.createElement("aside", {
+    className: `fixed inset-y-0 left-0 z-40 w-64 bg-neutral-900 text-white flex flex-col transform transition-transform duration-200 md:static md:z-auto md:w-60 md:shrink-0 md:translate-x-0 ${navOpen ? "translate-x-0" : "-translate-x-full"}`
   }, /*#__PURE__*/React.createElement("div", {
-    className: "px-5 pt-6 pb-4"
-  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-5 pt-6 pb-4 flex items-start justify-between"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     style: {
       fontFamily: "'Barlow Condensed', sans-serif"
     },
     className: "text-3xl font-bold tracking-tight leading-none"
   }, "Kils Import/Export"), /*#__PURE__*/React.createElement("div", {
     className: "text-[11px] text-stone-400 mt-1"
-  }, "Gestion boutique — pneus d'occasion")), /*#__PURE__*/React.createElement(TreadRule, null), /*#__PURE__*/React.createElement("nav", {
-    className: "flex-1 py-3"
+  }, "Gestion boutique — pneus d'occasion")), /*#__PURE__*/React.createElement("button", {
+    onClick: () => setNavOpen(false),
+    className: "text-stone-400 hover:text-white md:hidden"
+  }, /*#__PURE__*/React.createElement(X, {
+    size: 20
+  }))), /*#__PURE__*/React.createElement(TreadRule, null), /*#__PURE__*/React.createElement("nav", {
+    className: "flex-1 py-3 overflow-y-auto"
   }, visibleNav.map(n => {
     const Icon = n.icon;
     const active = activeTab === n.id;
     return /*#__PURE__*/React.createElement("button", {
       key: n.id,
-      onClick: () => setTab(n.id),
+      onClick: () => {
+        setTab(n.id);
+        setNavOpen(false);
+      },
       className: `w-full flex items-center gap-3 px-5 py-2.5 text-sm text-left transition-colors border-l-4 ${active ? "bg-neutral-800 border-orange-600 text-white" : "border-transparent text-stone-400 hover:bg-neutral-800 hover:text-white"}`
     }, /*#__PURE__*/React.createElement(Icon, {
       size: 17
@@ -546,21 +586,28 @@ function App() {
   }))))), /*#__PURE__*/React.createElement("main", {
     className: "flex-1 min-w-0"
   }, /*#__PURE__*/React.createElement("header", {
-    className: "bg-white border-b border-stone-200 px-8 py-4 flex items-center justify-between"
-  }, /*#__PURE__*/React.createElement("h1", {
+    className: "bg-white border-b border-stone-200 px-4 md:px-8 py-4 flex items-center justify-between gap-3"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3 min-w-0"
+  }, /*#__PURE__*/React.createElement("button", {
+    onClick: () => setNavOpen(true),
+    className: "text-neutral-700 md:hidden shrink-0"
+  }, /*#__PURE__*/React.createElement(Menu, {
+    size: 22
+  })), /*#__PURE__*/React.createElement("h1", {
     style: {
       fontFamily: "'Barlow Condensed', sans-serif"
     },
-    className: "text-2xl font-bold"
-  }, visibleNav.find(n => n.id === activeTab)?.label), /*#__PURE__*/React.createElement("div", {
-    className: "text-sm text-stone-500"
+    className: "text-xl md:text-2xl font-bold truncate"
+  }, visibleNav.find(n => n.id === activeTab)?.label)), /*#__PURE__*/React.createElement("div", {
+    className: "text-sm text-stone-500 hidden sm:block shrink-0"
   }, new Date().toLocaleDateString("fr-FR", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric"
   }))), /*#__PURE__*/React.createElement("div", {
-    className: "p-8"
+    className: "p-4 md:p-8"
   }, activeTab === "dashboard" && /*#__PURE__*/React.createElement(Dashboard, {
     products: products,
     lowStock: lowStock,
@@ -863,7 +910,9 @@ function UsersAdmin({
     onClick: () => setModal(true)
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 16
-  }), " Nouvel utilisateur")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("table", {
+  }), " Nouvel utilisateur")), /*#__PURE__*/React.createElement(Card, null, /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -922,7 +971,7 @@ function UsersAdmin({
     title: "Supprimer"
   }, /*#__PURE__*/React.createElement(Trash2, {
     size: 15
-  })))))))))), /*#__PURE__*/React.createElement("p", {
+  }))))))))))), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-stone-400 mt-3"
   }, "Identification simplifiée pour une équipe en boutique (pas un système de sécurité de niveau bancaire)."), modal && /*#__PURE__*/React.createElement(Modal, {
     title: "Nouvel utilisateur",
@@ -1033,7 +1082,9 @@ function Dashboard({
   }, "Derniers mouvements de stock"), moves.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     text: "Aucun mouvement enregistré",
     icon: Boxes
-  }) : /*#__PURE__*/React.createElement("table", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("tbody", null, moves.slice(0, 6).map(m => {
     const p = products.find(pp => pp.id === m.productId);
@@ -1053,7 +1104,7 @@ function Dashboard({
     }, "+", m.qty) : /*#__PURE__*/React.createElement("span", {
       className: "text-red-700 font-semibold"
     }, "-", m.qty)));
-  })))));
+  }))))));
 }
 
 /* ---------------------------- Products ----------------------------------- */
@@ -1092,9 +1143,9 @@ function Products({
     if (confirm("Supprimer ce produit ?")) setProducts(prev => prev.filter(p => p.id !== id));
   };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-4 gap-3"
+    className: "flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "relative w-72"
+    className: "relative w-full sm:w-72"
   }, /*#__PURE__*/React.createElement(Search, {
     size: 16,
     className: "absolute left-3 top-2.5 text-stone-400"
@@ -1110,7 +1161,9 @@ function Products({
   }), " Nouveau produit")), /*#__PURE__*/React.createElement(Card, null, filtered.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     text: "Aucun produit. Ajoutez votre premier pneu.",
     icon: Package
-  }) : /*#__PURE__*/React.createElement("table", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -1165,7 +1218,7 @@ function Products({
     className: "text-stone-500 hover:text-red-700"
   }, /*#__PURE__*/React.createElement(Trash2, {
     size: 15
-  }))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
+  })))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
     title: modal.id ? "Modifier le produit" : "Nouveau produit",
     onClose: () => setModal(null)
   }, /*#__PURE__*/React.createElement(ProductForm, {
@@ -1303,7 +1356,9 @@ function Stock({
   }), " ", lowStock.length, " produit(s) au seuil d'alerte ou en rupture."), /*#__PURE__*/React.createElement(Card, null, products.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     text: "Aucun produit en stock",
     icon: Boxes
-  }) : /*#__PURE__*/React.createElement("table", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -1341,7 +1396,7 @@ function Stock({
   }, /*#__PURE__*/React.createElement(Btn, {
     variant: "ghost",
     onClick: () => setAdjustFor(p)
-  }, "Ajuster"))))))), /*#__PURE__*/React.createElement(Card, {
+  }, "Ajuster")))))))), /*#__PURE__*/React.createElement(Card, {
     className: "p-5"
   }, /*#__PURE__*/React.createElement("h3", {
     className: "font-bold mb-3",
@@ -1350,7 +1405,9 @@ function Stock({
     }
   }, "Historique des mouvements"), moves.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-stone-500"
-  }, "Aucun mouvement.") : /*#__PURE__*/React.createElement("table", {
+  }, "Aucun mouvement.") : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -1378,7 +1435,7 @@ function Stock({
     }, /*#__PURE__*/React.createElement(ArrowDownCircle, {
       size: 14
     }), "-", m.qty)));
-  })))), adjustFor && /*#__PURE__*/React.createElement(Modal, {
+  }))))), adjustFor && /*#__PURE__*/React.createElement(Modal, {
     title: `Ajuster le stock — ${adjustFor.name}`,
     onClose: () => setAdjustFor(null)
   }, /*#__PURE__*/React.createElement(AdjustForm, {
@@ -1462,9 +1519,9 @@ function Customers({
   };
   const spentBy = id => sales.filter(s => s.customerId === id).reduce((s, sale) => s + Number(sale.total), 0);
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-4 gap-3"
+    className: "flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3"
   }, /*#__PURE__*/React.createElement("div", {
-    className: "relative w-72"
+    className: "relative w-full sm:w-72"
   }, /*#__PURE__*/React.createElement(Search, {
     size: 16,
     className: "absolute left-3 top-2.5 text-stone-400"
@@ -1486,7 +1543,9 @@ function Customers({
   }), " Nouveau client")), /*#__PURE__*/React.createElement(Card, null, filtered.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     text: "Aucun client enregistré",
     icon: Users
-  }) : /*#__PURE__*/React.createElement("table", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -1530,7 +1589,7 @@ function Customers({
     className: "text-stone-500 hover:text-red-700"
   }, /*#__PURE__*/React.createElement(Trash2, {
     size: 15
-  }))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
+  })))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
     title: modal.id ? "Modifier le client" : "Nouveau client",
     onClose: () => setModal(null)
   }, /*#__PURE__*/React.createElement("form", {
@@ -1585,7 +1644,9 @@ function Customers({
     wide: true
   }, sales.filter(s => s.customerId === detail.id).length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-stone-500"
-  }, "Aucun achat pour ce client.") : /*#__PURE__*/React.createElement("table", {
+  }, "Aucun achat pour ce client.") : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -1604,7 +1665,7 @@ function Customers({
     tone: "ok"
   }, "Payé") : /*#__PURE__*/React.createElement(Badge, {
     tone: "warn"
-  }, "Non payé"))))))));
+  }, "Non payé")))))))));
 }
 
 /* ---------------------------- Suppliers ---------------------------------- */
@@ -1639,7 +1700,9 @@ function Suppliers({
   }), " Nouveau fournisseur")), /*#__PURE__*/React.createElement(Card, null, suppliers.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     text: "Aucun fournisseur enregistré",
     icon: Building2
-  }) : /*#__PURE__*/React.createElement("table", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -1678,7 +1741,7 @@ function Suppliers({
     className: "text-stone-500 hover:text-red-700"
   }, /*#__PURE__*/React.createElement(Trash2, {
     size: 15
-  }))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
+  })))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
     title: modal.id ? "Modifier le fournisseur" : "Nouveau fournisseur",
     onClose: () => setModal(null)
   }, /*#__PURE__*/React.createElement("form", {
@@ -1783,7 +1846,9 @@ function Orders({
   }), " Nouvelle commande")), /*#__PURE__*/React.createElement(Card, null, orders.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     text: "Aucune commande fournisseur",
     icon: ShoppingCart
-  }) : /*#__PURE__*/React.createElement("table", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -1829,7 +1894,7 @@ function Orders({
     }, /*#__PURE__*/React.createElement(CheckCircle2, {
       size: 15
     }), " Réceptionner"))));
-  })))), modal && /*#__PURE__*/React.createElement(Modal, {
+  }))))), modal && /*#__PURE__*/React.createElement(Modal, {
     title: "Nouvelle commande fournisseur",
     onClose: () => setModal(null),
     wide: true
@@ -2141,7 +2206,9 @@ function SalesShipping({
   }), " Nouvelle vente")), /*#__PURE__*/React.createElement(Card, null, sales.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     text: "Aucune vente enregistrée",
     icon: ShoppingCart
-  }) : /*#__PURE__*/React.createElement("table", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -2200,7 +2267,7 @@ function SalesShipping({
     }, /*#__PURE__*/React.createElement(Truck, {
       size: 14
     }), " ", ship.status === "prep" ? "Expédier" : "Livrée"))));
-  })))), modal && /*#__PURE__*/React.createElement(Modal, {
+  }))))), modal && /*#__PURE__*/React.createElement(Modal, {
     title: "Nouvelle vente",
     onClose: () => setModal(false),
     wide: true
@@ -2516,7 +2583,9 @@ function Bank({
   }), " Nouvelle écriture")), txns.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     text: "Aucune écriture bancaire",
     icon: Landmark
-  }) : /*#__PURE__*/React.createElement("table", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -2534,7 +2603,7 @@ function Bank({
     }, t.date), /*#__PURE__*/React.createElement("td", null, t.label), /*#__PURE__*/React.createElement("td", null, acc?.name), /*#__PURE__*/React.createElement("td", {
       className: `text-right font-semibold ${t.type === "credit" ? "text-emerald-700" : "text-red-700"}`
     }, t.type === "credit" ? "+" : "-", cfa(t.amount)));
-  }))))), accModal && /*#__PURE__*/React.createElement(Modal, {
+  })))))), accModal && /*#__PURE__*/React.createElement(Modal, {
     title: "Nouveau compte",
     onClose: () => setAccModal(false)
   }, /*#__PURE__*/React.createElement(AccountForm, {
@@ -3119,7 +3188,7 @@ function Billing({
     }
   };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between mb-4"
+    className: "flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-3"
   }, /*#__PURE__*/React.createElement("div", {
     className: "inline-flex rounded-md border border-stone-300 overflow-hidden"
   }, /*#__PURE__*/React.createElement("button", {
@@ -3139,7 +3208,9 @@ function Billing({
   }), " Nouvelle facture")), subTab === "quotes" && /*#__PURE__*/React.createElement(Card, null, quotes.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     text: "Aucun devis / proposition de service",
     icon: Receipt
-  }) : /*#__PURE__*/React.createElement("table", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -3199,10 +3270,12 @@ function Billing({
     onClick: () => convertToInvoice(q)
   }, /*#__PURE__*/React.createElement(ArrowRightCircle, {
     size: 14
-  }), " Convertir en facture")))))))), subTab === "invoices" && /*#__PURE__*/React.createElement(Card, null, invoices.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
+  }), " Convertir en facture"))))))))), subTab === "invoices" && /*#__PURE__*/React.createElement(Card, null, invoices.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     text: "Aucune facture",
     icon: FileText
-  }) : /*#__PURE__*/React.createElement("table", {
+  }) : /*#__PURE__*/React.createElement("div", {
+    className: "overflow-x-auto"
+  }, /*#__PURE__*/React.createElement("table", {
     className: "w-full text-sm"
   }, /*#__PURE__*/React.createElement("thead", null, /*#__PURE__*/React.createElement("tr", {
     className: "text-left text-xs uppercase text-stone-400 border-b border-stone-100"
@@ -3254,7 +3327,7 @@ function Billing({
     }, /*#__PURE__*/React.createElement(CheckCircle2, {
       size: 14
     }), " Marquer payée"))));
-  })))), quoteModal && /*#__PURE__*/React.createElement(Modal, {
+  }))))), quoteModal && /*#__PURE__*/React.createElement(Modal, {
     title: "Nouveau devis / proposition de service",
     onClose: () => setQuoteModal(false),
     wide: true
