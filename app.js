@@ -2156,7 +2156,30 @@ function SalesShipping({
   currentUser
 }) {
   const [modal, setModal] = useState(false);
+  const [editSale, setEditSale] = useState(null);
   const [pdfBusy, setPdfBusy] = useState(null);
+  const updateSale = data => {
+    const total = data.items.reduce((s, it) => s + Number(it.qty) * Number(it.unitPrice), 0);
+    setSales(prev => prev.map(s => s.id === editSale.id ? {
+      ...s,
+      customerId: data.customerId,
+      customer: data.customerName,
+      phone: data.phone,
+      items: data.items,
+      total
+    } : s));
+    setShipments(prev => prev.map(sh => sh.saleId === editSale.id ? {
+      ...sh,
+      address: data.address,
+      carrier: data.carrier
+    } : sh));
+    setEditSale(null);
+  };
+  const deleteSale = id => {
+    if (confirm("Supprimer cette vente ? Cette action est irréversible.")) {
+      setSales(prev => prev.filter(s => s.id !== id));
+    }
+  };
   const createSale = ({
     customerId,
     customerName,
@@ -2328,7 +2351,15 @@ function SalesShipping({
       onClick: () => advanceShipment(ship.id)
     }, /*#__PURE__*/React.createElement(Truck, {
       size: 14
-    }), " ", ship.status === "prep" ? "Expédier" : "Livrée"))));
+    }), " ", ship.status === "prep" ? "Expédier" : "Livrée"), /*#__PURE__*/React.createElement(Btn, {
+      variant: "ghost",
+      onClick: () => setEditSale(s)
+    }, /*#__PURE__*/React.createElement(Pencil, {
+      size: 14
+    }), " Modifier"), currentUser?.role === "admin" && /*#__PURE__*/React.createElement(Btn, {
+      variant: "danger",
+      onClick: () => deleteSale(s.id)
+    }, "Supprimer"))));
   }))))), modal && /*#__PURE__*/React.createElement(Modal, {
     title: "Nouvelle vente",
     onClose: () => setModal(false),
@@ -2340,6 +2371,18 @@ function SalesShipping({
     setCustomers: setCustomers,
     onSave: createSale,
     onCancel: () => setModal(false)
+  })), editSale && /*#__PURE__*/React.createElement(Modal, {
+    title: "Modifier la vente",
+    onClose: () => setEditSale(null),
+    wide: true
+  }, /*#__PURE__*/React.createElement(SaleForm, {
+    products: products,
+    accounts: accounts,
+    customers: customers,
+    setCustomers: setCustomers,
+    sale: editSale,
+    onSave: updateSale,
+    onCancel: () => setEditSale(null)
   })));
 }
 function SaleForm({
@@ -2347,22 +2390,23 @@ function SaleForm({
   accounts,
   customers,
   setCustomers,
+  sale,
   onSave,
   onCancel
 }) {
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(sale?.customerId || "");
   const [newCustomer, setNewCustomer] = useState(false);
-  const [customerName, setCustomerName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [carrier, setCarrier] = useState("");
-  const [paid, setPaid] = useState(true);
+  const [customerName, setCustomerName] = useState(sale?.customerId ? "" : sale?.customer || "");
+  const [phone, setPhone] = useState(sale?.phone || "");
+  const [address, setAddress] = useState(sale?.address || "");
+  const [carrier, setCarrier] = useState(sale?.carrier || "");
+  const [paid, setPaid] = useState(sale?.paid ?? true);
   const [accountId, setAccountId] = useState(accounts[0]?.id || "");
-  const [items, setItems] = useState(products.length ? [{
+  const [items, setItems] = useState(sale?.items || (products.length ? [{
     productId: products[0].id,
     qty: 1,
     unitPrice: products[0].minSalePrice
-  }] : []);
+  }] : []));
   const selectCustomer = id => {
     setCustomerId(id);
     const c = customers.find(cc => cc.id === id);
@@ -2540,7 +2584,7 @@ function SaleForm({
     size: 14
   }), " Ajouter une ligne")), !stockOk && /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-red-700 mt-2"
-  }, "Quantité demandée supérieure au stock disponible."), /*#__PURE__*/React.createElement("div", {
+  }, "Quantité demandée supérieure au stock disponible."), !sale && /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mt-4"
   }, /*#__PURE__*/React.createElement("label", {
     className: "flex items-center gap-2 text-sm"
@@ -2568,7 +2612,7 @@ function SaleForm({
   }, "Annuler"), /*#__PURE__*/React.createElement(Btn, {
     type: "submit",
     disabled: products.length === 0 || !stockOk
-  }, "Enregistrer la vente")));
+  }, sale ? "Enregistrer les modifications" : "Enregistrer la vente")));
 }
 
 /* ---------------------------- Bank ---------------------------------------- */
