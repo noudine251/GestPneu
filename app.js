@@ -414,7 +414,7 @@ const NAV = [{
   id: "bank",
   label: "Banque",
   icon: Landmark,
-  roles: ["admin"]
+  roles: ["admin", "vendeur"]
 }, {
   id: "users",
   label: "Utilisateurs",
@@ -2637,7 +2637,7 @@ function Bank({
     style: {
       fontFamily: "'Barlow Condensed', sans-serif"
     }
-  }, "Comptes"), /*#__PURE__*/React.createElement("button", {
+  }, "Comptes"), currentUser?.role === "admin" && /*#__PURE__*/React.createElement("button", {
     onClick: () => setAccModal(true),
     className: "text-orange-600"
   }, /*#__PURE__*/React.createElement(Plus, {
@@ -2677,7 +2677,7 @@ function Bank({
     style: {
       fontFamily: "'Barlow Condensed', sans-serif"
     }
-  }, "Écritures bancaires"), /*#__PURE__*/React.createElement(Btn, {
+  }, "Écritures bancaires"), currentUser?.role === "admin" && /*#__PURE__*/React.createElement(Btn, {
     onClick: () => setTxnModal(true)
   }, /*#__PURE__*/React.createElement(Plus, {
     size: 16
@@ -2705,7 +2705,7 @@ function Bank({
       className: `text-right font-semibold ${t.type === "credit" ? "text-emerald-700" : "text-red-700"}`
     }, t.type === "credit" ? "+" : "-", cfa(t.amount)), /*#__PURE__*/React.createElement("td", {
       className: "text-right"
-    }, /*#__PURE__*/React.createElement("button", {
+    }, currentUser?.role === "admin" && /*#__PURE__*/React.createElement("button", {
       onClick: () => deleteTxn(t.id),
       className: "text-stone-400 hover:text-red-700 text-xs font-medium"
     }, "Supprimer")));
