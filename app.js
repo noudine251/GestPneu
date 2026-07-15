@@ -806,7 +806,7 @@ function Login({
     className: "font-medium"
   }, u.name), /*#__PURE__*/React.createElement(Badge, {
     tone: u.role === "admin" ? "info" : "neutral"
-  }, ROLE_LABEL[u.role])))), /*#__PURE__*/React.createElement("button", {
+  }, ROLE_LABEL[u.role])))), users.length === 0 && /*#__PURE__*/React.createElement("button", {
     onClick: () => setMode("create"),
     className: "text-sm text-orange-600 font-medium"
   }, "+ Ajouter un nouvel utilisateur")), mode === "select" && selected && /*#__PURE__*/React.createElement("form", {
