@@ -80,18 +80,18 @@ const INVOICE_STATUS_TONE = {
   overdue: "danger"
 };
 const KEYS = {
-  products: "kils:products",
-  suppliers: "kils:suppliers",
-  orders: "kils:purchaseOrders",
-  moves: "kils:stockMovements",
-  sales: "kils:sales",
-  shipments: "kils:shipments",
-  accounts: "kils:bankAccounts",
-  txns: "kils:bankTransactions",
-  customers: "kils:customers",
-  users: "kils:users",
-  quotes: "kils:quotes",
-  invoices: "kils:invoices"
+  products: "kils_products",
+  suppliers: "kils_suppliers",
+  orders: "kils_purchaseOrders",
+  moves: "kils_stockMovements",
+  sales: "kils_sales",
+  shipments: "kils_shipments",
+  accounts: "kils_bankAccounts",
+  txns: "kils_bankTransactions",
+  customers: "kils_customers",
+  users: "kils_users",
+  quotes: "kils_quotes",
+  invoices: "kils_invoices"
 };
 
 // saveC/subscribeC (Firestore temps réel) sont définies dans firebase-init.js,
@@ -632,7 +632,10 @@ function App() {
   }, currentUser.name), /*#__PURE__*/React.createElement("div", {
     className: "text-stone-500"
   }, ROLE_LABEL[currentUser.role]), /*#__PURE__*/React.createElement("button", {
-    onClick: () => setCurrentUser(null),
+    onClick: () => {
+      logoutUser();
+      setCurrentUser(null);
+    },
     className: "mt-2 flex items-center gap-1.5 text-stone-400 hover:text-white"
   }, /*#__PURE__*/React.createElement(LogOut, {
     size: 14
@@ -750,25 +753,37 @@ function Login({
   const [pin, setPin] = useState("");
   const [error, setError] = useState("");
   const active = users.filter(u => u.active !== false);
-  const tryLogin = e => {
+  const [busy, setBusy] = useState(false);
+  const tryLogin = async e => {
     e.preventDefault();
-    if (!selected) return;
-    if (String(selected.pin) !== String(pin)) {
+    if (!selected || busy) return;
+    setBusy(true);
+    try {
+      await loginUser(selected.authEmail, pin);
+      setError("");
+      onLogin(selected);
+    } catch (err) {
       setError("Code PIN incorrect.");
-      return;
+    } finally {
+      setBusy(false);
     }
-    setError("");
-    onLogin(selected);
   };
-  const createFirst = data => {
+  const createFirst = async data => {
+    const role = users.length ? data.role : "admin";
+    const {
+      authUid,
+      authEmail
+    } = await createUserAccount(data.pin, role);
     const u = {
-      ...data,
-      id: uid(),
-      role: users.length ? data.role : "admin",
+      name: data.name,
+      id: authUid,
+      authEmail,
+      role,
       active: true,
       createdAt: today()
     };
     setUsers(prev => [...prev, u]);
+    await loginUser(authEmail, data.pin);
     onLogin(u);
   };
   return /*#__PURE__*/React.createElement("div", {
@@ -924,28 +939,33 @@ function UsersAdmin({
   currentUser
 }) {
   const [modal, setModal] = useState(false);
-  const create = data => {
+  const create = async data => {
+    const {
+      authUid,
+      authEmail
+    } = await createUserAccount(data.pin, data.role);
     setUsers(prev => [...prev, {
-      ...data,
-      id: uid(),
+      name: data.name,
+      role: data.role,
+      id: authUid,
+      authEmail,
       active: true,
       createdAt: today()
     }]);
     setModal(false);
   };
-  const toggleActive = id => setUsers(prev => prev.map(u => u.id === id ? {
-    ...u,
-    active: !u.active
-  } : u));
-  const changeRole = (id, role) => setUsers(prev => prev.map(u => u.id === id ? {
-    ...u,
-    role
-  } : u));
-  const resetPin = id => {
-    const pin = prompt("Nouveau code PIN (4 chiffres min.) :");
-    if (pin && pin.length >= 4) setUsers(prev => prev.map(u => u.id === id ? {
+  const toggleActive = (id, role, wasActive) => {
+    updateUserRole(id, role, !wasActive);
+    setUsers(prev => prev.map(u => u.id === id ? {
       ...u,
-      pin
+      active: !u.active
+    } : u));
+  };
+  const changeRole = (id, role) => {
+    updateUserRole(id, role, true);
+    setUsers(prev => prev.map(u => u.id === id ? {
+      ...u,
+      role
     } : u));
   };
   const renameUser = (id, currentName) => {
@@ -956,7 +976,10 @@ function UsersAdmin({
     } : u));
   };
   const removeUser = (id, name) => {
-    if (confirm(`Supprimer définitivement l'utilisateur "${name}" ?`)) setUsers(prev => prev.filter(u => u.id !== id));
+    if (confirm(`Supprimer définitivement l'utilisateur "${name}" ?`)) {
+      revokeUserRole(id);
+      setUsers(prev => prev.filter(u => u.id !== id));
+    }
   };
   return /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
     className: "flex justify-end mb-4"
@@ -1011,14 +1034,9 @@ function UsersAdmin({
     onClick: () => renameUser(u.id, u.name)
   }, /*#__PURE__*/React.createElement(Pencil, {
     size: 14
-  }), " Renommer"), /*#__PURE__*/React.createElement(Btn, {
-    variant: "ghost",
-    onClick: () => resetPin(u.id)
-  }, /*#__PURE__*/React.createElement(KeyRound, {
-    size: 14
-  }), " PIN"), u.id !== currentUser.id && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Btn, {
+  }), " Renommer"), u.id !== currentUser.id && /*#__PURE__*/React.createElement(React.Fragment, null, /*#__PURE__*/React.createElement(Btn, {
     variant: u.active !== false ? "danger" : "ghost",
-    onClick: () => toggleActive(u.id)
+    onClick: () => toggleActive(u.id, u.role, u.active !== false)
   }, u.active !== false ? "Désactiver" : "Réactiver"), /*#__PURE__*/React.createElement("button", {
     onClick: () => removeUser(u.id, u.name),
     className: "text-stone-500 hover:text-red-700 px-1 text-xs font-medium"
