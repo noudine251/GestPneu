@@ -680,6 +680,7 @@ function App() {
   }), activeTab === "stock" && /*#__PURE__*/React.createElement(Stock, {
     products: products,
     moves: moves,
+    setMoves: setMoves,
     lowStock: lowStock,
     adjustStock: adjustStock
   }), activeTab === "customers" && /*#__PURE__*/React.createElement(Customers, {
@@ -1392,10 +1393,17 @@ function ProductForm({
 function Stock({
   products,
   moves,
+  setMoves,
   lowStock,
   adjustStock
 }) {
   const [adjustFor, setAdjustFor] = useState(null);
+  const deleteMove = id => {
+    if (confirm("Supprimer ce mouvement de l'historique ?")) setMoves(prev => prev.filter(m => m.id !== id));
+  };
+  const clearMoves = () => {
+    if (confirm("Vider tout l'historique des mouvements de stock ? Cette action est irréversible.")) setMoves([]);
+  };
   return /*#__PURE__*/React.createElement("div", {
     className: "space-y-6"
   }, lowStock.length > 0 && /*#__PURE__*/React.createElement("div", {
@@ -1447,12 +1455,17 @@ function Stock({
     onClick: () => setAdjustFor(p)
   }, "Ajuster")))))))), /*#__PURE__*/React.createElement(Card, {
     className: "p-5"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-3"
   }, /*#__PURE__*/React.createElement("h3", {
-    className: "font-bold mb-3",
+    className: "font-bold",
     style: {
       fontFamily: "'Barlow Condensed', sans-serif"
     }
-  }, "Historique des mouvements"), moves.length === 0 ? /*#__PURE__*/React.createElement("p", {
+  }, "Historique des mouvements"), moves.length > 0 && /*#__PURE__*/React.createElement("button", {
+    onClick: clearMoves,
+    className: "text-xs font-medium text-red-700 hover:text-red-900"
+  }, "Vider l'historique")), moves.length === 0 ? /*#__PURE__*/React.createElement("p", {
     className: "text-sm text-stone-500"
   }, "Aucun mouvement.") : /*#__PURE__*/React.createElement("div", {
     className: "overflow-x-auto"
@@ -1464,7 +1477,7 @@ function Stock({
     className: "py-2"
   }, "Date"), /*#__PURE__*/React.createElement("th", null, "Produit"), /*#__PURE__*/React.createElement("th", null, "Motif"), /*#__PURE__*/React.createElement("th", null, "Par"), /*#__PURE__*/React.createElement("th", {
     className: "text-right"
-  }, "Quantité"))), /*#__PURE__*/React.createElement("tbody", null, moves.map(m => {
+  }, "Quantité"), /*#__PURE__*/React.createElement("th", null))), /*#__PURE__*/React.createElement("tbody", null, moves.map(m => {
     const p = products.find(pp => pp.id === m.productId);
     return /*#__PURE__*/React.createElement("tr", {
       key: m.id,
@@ -1483,7 +1496,12 @@ function Stock({
       className: "text-red-700 font-semibold flex items-center gap-1 justify-end"
     }, /*#__PURE__*/React.createElement(ArrowDownCircle, {
       size: 14
-    }), "-", m.qty)));
+    }), "-", m.qty)), /*#__PURE__*/React.createElement("td", {
+      className: "text-right"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => deleteMove(m.id),
+      className: "text-xs font-medium text-stone-400 hover:text-red-700"
+    }, "Supprimer")));
   }))))), adjustFor && /*#__PURE__*/React.createElement(Modal, {
     title: `Ajuster le stock — ${adjustFor.name}`,
     onClose: () => setAdjustFor(null)
