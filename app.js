@@ -626,18 +626,17 @@ function App() {
   }, /*#__PURE__*/React.createElement(Phone, {
     size: 12
   }), " ", COMPANY.phone), /*#__PURE__*/React.createElement("div", {
-    className: "flex items-center justify-between pt-2 border-t border-neutral-800"
-  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "pt-2 border-t border-neutral-800"
+  }, /*#__PURE__*/React.createElement("div", {
     className: "text-white text-sm font-medium"
   }, currentUser.name), /*#__PURE__*/React.createElement("div", {
     className: "text-stone-500"
-  }, ROLE_LABEL[currentUser.role])), /*#__PURE__*/React.createElement("button", {
+  }, ROLE_LABEL[currentUser.role]), /*#__PURE__*/React.createElement("button", {
     onClick: () => setCurrentUser(null),
-    title: "Changer d'utilisateur",
-    className: "text-stone-400 hover:text-white"
+    className: "mt-2 flex items-center gap-1.5 text-stone-400 hover:text-white"
   }, /*#__PURE__*/React.createElement(LogOut, {
-    size: 16
-  }))))), /*#__PURE__*/React.createElement("main", {
+    size: 14
+  }), "Déconnexion")))), /*#__PURE__*/React.createElement("main", {
     className: "flex-1 min-w-0"
   }, /*#__PURE__*/React.createElement("header", {
     className: "bg-white border-b border-stone-200 px-4 md:px-8 py-4 flex items-center justify-between gap-3"
