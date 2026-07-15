@@ -99,91 +99,145 @@ const KEYS = {
 
 /* ---------------------------- PDF (jsPDF via CDN) ------------------------ */
 
-function loadScriptOnce(src) {
+function loadScriptOnce(src, isReady) {
+  const ready = isReady || (() => !!window.jspdf);
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[data-src="${src}"]`)) {
-      const check = () => window.jspdf ? resolve() : setTimeout(check, 50);
+      const check = () => ready() ? resolve() : setTimeout(check, 50);
       return check();
     }
     const s = document.createElement("script");
     s.src = src;
     s.dataset.src = src;
     s.onload = () => resolve();
-    s.onerror = () => reject(new Error("Impossible de charger jsPDF"));
+    s.onerror = () => reject(new Error("Impossible de charger " + src));
     document.head.appendChild(s);
   });
 }
 async function ensureJsPDF() {
-  if (!window.jspdf) {
-    await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js");
-  }
+  await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js", () => !!window.jspdf);
+  await loadScriptOnce("https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js", () => !!(window.jspdf && window.jspdf.jsPDF.API.autoTable));
   return window.jspdf.jsPDF;
 }
+// La police par défaut de jsPDF ne gère pas l'espace fine insécable utilisée par Intl "fr-FR" — on la remplace par un espace normal pour l'impression.
+const pdfNum = n => FMT.format(Math.round(Number(n) || 0)).replace(/ /g, " ");
 async function generateDocPDF(kind, record, customer) {
   const JsPDF = await ensureJsPDF();
   const doc = new JsPDF();
   const title = kind === "devis" ? "DEVIS" : "FACTURE";
-  doc.setFontSize(22);
+  const DARK = [23, 23, 23];
+  const ORANGE = [232, 89, 12];
+  const GRAY = [140, 140, 140];
+
+  // Bandeau d'en-tête
+  doc.setFillColor(...DARK);
+  doc.rect(0, 0, 210, 38, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(20);
   doc.setFont(undefined, "bold");
-  doc.text(COMPANY.name, 14, 20);
+  doc.text(COMPANY.name, 14, 17);
   doc.setFontSize(9);
   doc.setFont(undefined, "normal");
-  doc.text(COMPANY.location, 14, 27);
-  doc.text(COMPANY.phone, 14, 32);
-  doc.setFontSize(15);
+  doc.text(COMPANY.location, 14, 25);
+  doc.text(COMPANY.phone, 14, 30);
+  doc.setFontSize(18);
   doc.setFont(undefined, "bold");
-  doc.text(title, 150, 20);
+  doc.text(title, 196, 17, { align: "right" });
   doc.setFontSize(9);
   doc.setFont(undefined, "normal");
-  doc.text(`N° ${record.number}`, 150, 27);
-  doc.text(`Date : ${record.date}`, 150, 32);
-  if (kind === "devis") doc.text(`Valable jusqu'au : ${record.validUntil || "-"}`, 150, 37);else doc.text(`Échéance : ${record.dueDate || record.date}`, 150, 37);
-  doc.setDrawColor(232, 89, 12);
-  doc.setLineWidth(1);
-  doc.line(14, 42, 196, 42);
+  doc.text(`N° ${record.number}`, 196, 25, { align: "right" });
+  doc.text(`Date : ${record.date}`, 196, 30, { align: "right" });
+  doc.setFillColor(...ORANGE);
+  doc.rect(0, 38, 210, 2, "F");
+
+  // Bloc client / échéance
+  let y = 52;
+  doc.setTextColor(...GRAY);
+  doc.setFontSize(8);
+  doc.setFont(undefined, "bold");
+  doc.text("FACTURÉ À", 14, y);
+  doc.text(kind === "devis" ? "VALABLE JUSQU'AU" : "ÉCHÉANCE", 196, y, { align: "right" });
+  y += 6;
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(11);
+  doc.text(customer?.name || record.customerName || "Client comptoir", 14, y);
   doc.setFontSize(10);
-  doc.setFont(undefined, "bold");
-  doc.text("Client", 14, 51);
+  doc.text(kind === "devis" ? record.validUntil || "-" : record.dueDate || record.date, 196, y, { align: "right" });
   doc.setFont(undefined, "normal");
-  doc.text(customer?.name || record.customerName || "Client comptoir", 14, 57);
-  if (customer?.phone || record.phone) doc.text(`Tel : ${customer?.phone || record.phone}`, 14, 62);
-  if (customer?.address || record.address) doc.text(customer?.address || record.address, 14, 67);
-  let y = 80;
-  doc.setFont(undefined, "bold");
-  doc.text("Désignation", 14, y);
-  doc.text("Qté", 122, y);
-  doc.text("P.U. (FCFA)", 140, y);
-  doc.text("Total (FCFA)", 172, y);
-  doc.setLineWidth(0.3);
-  doc.line(14, y + 2, 196, y + 2);
-  doc.setFont(undefined, "normal");
-  y += 9;
-  record.items.forEach(it => {
-    doc.text(String(it.label || "Article").slice(0, 46), 14, y);
-    doc.text(String(it.qty), 122, y);
-    doc.text(FMT.format(it.unitPrice), 140, y);
-    doc.text(FMT.format(it.qty * it.unitPrice), 172, y);
-    y += 7;
+  doc.setFontSize(9);
+  if (customer?.phone || record.phone) {
+    y += 6;
+    doc.text(`Tél : ${customer?.phone || record.phone}`, 14, y);
+  }
+  if (customer?.address || record.address) {
+    y += 6;
+    doc.text(String(customer?.address || record.address), 14, y);
+  }
+
+  // Tableau des lignes
+  const rows = record.items.map(it => [String(it.label || "Article"), String(it.qty), `${pdfNum(it.unitPrice)} FCFA`, `${pdfNum(it.qty * it.unitPrice)} FCFA`]);
+  doc.autoTable({
+    startY: 75,
+    head: [["Désignation", "Qté", "P.U.", "Total"]],
+    body: rows,
+    theme: "striped",
+    styles: {
+      fontSize: 9,
+      cellPadding: 3
+    },
+    headStyles: {
+      fillColor: DARK,
+      textColor: 255,
+      fontStyle: "bold"
+    },
+    columnStyles: {
+      1: {
+        halign: "right",
+        cellWidth: 20
+      },
+      2: {
+        halign: "right",
+        cellWidth: 35
+      },
+      3: {
+        halign: "right",
+        cellWidth: 35
+      }
+    },
+    margin: {
+      left: 14,
+      right: 14
+    }
   });
-  y += 3;
-  doc.line(14, y, 196, y);
-  y += 9;
+  let finalY = doc.lastAutoTable.finalY + 10;
+
+  // Total mis en évidence
+  doc.setFillColor(...ORANGE);
+  doc.rect(120, finalY - 8, 76, 12, "F");
+  doc.setTextColor(255, 255, 255);
   doc.setFont(undefined, "bold");
   doc.setFontSize(12);
-  doc.text(`TOTAL : ${FMT.format(record.total)} FCFA`, 140, y);
-  y += 9;
-  doc.setFontSize(10);
+  doc.text(`TOTAL : ${pdfNum(record.total)} FCFA`, 192, finalY, { align: "right" });
+  finalY += 16;
+  doc.setTextColor(0, 0, 0);
+  doc.setFontSize(9);
   doc.setFont(undefined, "normal");
-  if (kind === "devis") doc.text(`Statut : ${QUOTE_STATUS_LABEL[record.status] || ""}`, 14, y);else doc.text(`Statut du paiement : ${INVOICE_STATUS_LABEL[record.status] || ""}`, 14, y);
-  if (record.notes) {
-    y += 8;
-    doc.setFontSize(9);
-    doc.text(`Notes : ${record.notes}`, 14, y);
+  const statusLabel = kind === "devis" ? QUOTE_STATUS_LABEL[record.status] : INVOICE_STATUS_LABEL[record.status];
+  if (statusLabel) {
+    doc.text(`Statut : ${statusLabel}`, 14, finalY);
+    finalY += 7;
   }
-  y += 20;
+  if (record.notes) {
+    doc.text(`Notes : ${record.notes}`, 14, finalY);
+  }
+
+  // Pied de page
+  doc.setDrawColor(225, 225, 225);
+  doc.setLineWidth(0.3);
+  doc.line(14, 280, 196, 280);
   doc.setFontSize(8);
-  doc.setTextColor(140);
-  doc.text("Merci pour votre confiance — Kils Import/Export, pneus d'occasion.", 14, y);
+  doc.setTextColor(...GRAY);
+  doc.text("Merci pour votre confiance — Kils Import/Export, pneus d'occasion.", 105, 286, { align: "center" });
   doc.save(`${record.number}.pdf`);
 }
 
@@ -967,11 +1021,8 @@ function UsersAdmin({
     onClick: () => toggleActive(u.id)
   }, u.active !== false ? "Désactiver" : "Réactiver"), /*#__PURE__*/React.createElement("button", {
     onClick: () => removeUser(u.id, u.name),
-    className: "text-stone-500 hover:text-red-700 px-1",
-    title: "Supprimer"
-  }, /*#__PURE__*/React.createElement(Trash2, {
-    size: 15
-  }))))))))))), /*#__PURE__*/React.createElement("p", {
+    className: "text-stone-500 hover:text-red-700 px-1 text-xs font-medium"
+  }, "Supprimer")))))))))), /*#__PURE__*/React.createElement("p", {
     className: "text-xs text-stone-400 mt-3"
   }, "Identification simplifiée pour une équipe en boutique (pas un système de sécurité de niveau bancaire)."), modal && /*#__PURE__*/React.createElement(Modal, {
     title: "Nouvel utilisateur",
@@ -1215,10 +1266,8 @@ function Products({
     size: 15
   })), isAdmin && /*#__PURE__*/React.createElement("button", {
     onClick: () => remove(p.id),
-    className: "text-stone-500 hover:text-red-700"
-  }, /*#__PURE__*/React.createElement(Trash2, {
-    size: 15
-  })))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
+    className: "text-stone-500 hover:text-red-700 text-xs font-medium"
+  }, "Supprimer"))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
     title: modal.id ? "Modifier le produit" : "Nouveau produit",
     onClose: () => setModal(null)
   }, /*#__PURE__*/React.createElement(ProductForm, {
@@ -1586,10 +1635,8 @@ function Customers({
     size: 15
   })), /*#__PURE__*/React.createElement("button", {
     onClick: () => remove(c.id),
-    className: "text-stone-500 hover:text-red-700"
-  }, /*#__PURE__*/React.createElement(Trash2, {
-    size: 15
-  })))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
+    className: "text-stone-500 hover:text-red-700 text-xs font-medium"
+  }, "Supprimer"))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
     title: modal.id ? "Modifier le client" : "Nouveau client",
     onClose: () => setModal(null)
   }, /*#__PURE__*/React.createElement("form", {
@@ -1738,10 +1785,8 @@ function Suppliers({
     size: 15
   })), /*#__PURE__*/React.createElement("button", {
     onClick: () => remove(s.id),
-    className: "text-stone-500 hover:text-red-700"
-  }, /*#__PURE__*/React.createElement(Trash2, {
-    size: 15
-  })))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
+    className: "text-stone-500 hover:text-red-700 text-xs font-medium"
+  }, "Supprimer"))))))))), modal && /*#__PURE__*/React.createElement(Modal, {
     title: modal.id ? "Modifier le fournisseur" : "Nouveau fournisseur",
     onClose: () => setModal(null)
   }, /*#__PURE__*/React.createElement("form", {
@@ -2139,7 +2184,7 @@ function SalesShipping({
     });
     setInvoices(prev => [{
       id: invoiceId,
-      number: `FAC-${invoiceId.slice(-6).toUpperCase()}`,
+      number: `FAC-${String(invoices.length + 1).padStart(4, "0")}`,
       customerId,
       customerName,
       phone,
@@ -2520,6 +2565,7 @@ function Bank({
   currentUser
 }) {
   const [accModal, setAccModal] = useState(false);
+  const [editAccountModal, setEditAccountModal] = useState(null);
   const [txnModal, setTxnModal] = useState(false);
   const totalBalance = accounts.reduce((s, a) => s + bankBalance(a.id), 0);
   const addAccount = (name, initial) => {
@@ -2530,6 +2576,23 @@ function Bank({
     }]);
     setAccModal(false);
   };
+  const updateAccount = (name, initial) => {
+    setAccounts(prev => prev.map(a => a.id === editAccountModal.id ? {
+      ...a,
+      name,
+      initial: Number(initial) || 0
+    } : a));
+    setEditAccountModal(null);
+  };
+  const resetAccount = id => {
+    if (confirm("Réinitialiser ce compte ? Toutes ses écritures seront supprimées, son solde reviendra à son solde initial.")) setTxns(prev => prev.filter(t => t.accountId !== id));
+  };
+  const deleteAccount = id => {
+    if (confirm("Supprimer ce compte et toutes ses écritures ? Cette action est irréversible.")) {
+      setAccounts(prev => prev.filter(a => a.id !== id));
+      setTxns(prev => prev.filter(t => t.accountId !== id));
+    }
+  };
   const addManualTxn = data => {
     setTxns(prev => [{
       ...data,
@@ -2539,6 +2602,9 @@ function Bank({
       by: currentUser?.name
     }, ...prev]);
     setTxnModal(false);
+  };
+  const deleteTxn = id => {
+    if (confirm("Supprimer cette écriture bancaire ?")) setTxns(prev => prev.filter(t => t.id !== id));
   };
   return /*#__PURE__*/React.createElement("div", {
     className: "space-y-6"
@@ -2560,12 +2626,29 @@ function Bank({
     size: 18
   }))), /*#__PURE__*/React.createElement("ul", {
     className: "space-y-2"
-  }, accounts.map(a => /*#__PURE__*/React.createElement("li", {
-    key: a.id,
-    className: "flex justify-between text-sm"
-  }, /*#__PURE__*/React.createElement("span", null, a.name), /*#__PURE__*/React.createElement("span", {
-    className: "font-semibold"
-  }, cfa(bankBalance(a.id)))))), /*#__PURE__*/React.createElement("div", {
+  }, accounts.map(a => {
+    const nameRow = /*#__PURE__*/React.createElement("div", {
+      className: "flex justify-between"
+    }, /*#__PURE__*/React.createElement("span", null, a.name), /*#__PURE__*/React.createElement("span", {
+      className: "font-semibold"
+    }, cfa(bankBalance(a.id))));
+    const actionsRow = currentUser?.role === "admin" && /*#__PURE__*/React.createElement("div", {
+      className: "flex gap-3 mt-1 text-xs"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => resetAccount(a.id),
+      className: "text-stone-500 hover:text-neutral-900"
+    }, "Réinitialiser"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => setEditAccountModal(a),
+      className: "text-stone-500 hover:text-neutral-900"
+    }, "Modifier"), /*#__PURE__*/React.createElement("button", {
+      onClick: () => deleteAccount(a.id),
+      className: "text-red-700 hover:text-red-900"
+    }, "Supprimer"));
+    return /*#__PURE__*/React.createElement("li", {
+      key: a.id,
+      className: "text-sm border-b border-stone-100 pb-2 last:border-0 last:pb-0"
+    }, nameRow, actionsRow);
+  })), /*#__PURE__*/React.createElement("div", {
     className: "border-t border-stone-100 mt-3 pt-3 flex justify-between font-bold"
   }, /*#__PURE__*/React.createElement("span", null, "Total"), /*#__PURE__*/React.createElement("span", null, cfa(totalBalance)))), /*#__PURE__*/React.createElement(Card, {
     className: "p-5 md:col-span-2"
@@ -2593,7 +2676,7 @@ function Bank({
     className: "py-2"
   }, "Date"), /*#__PURE__*/React.createElement("th", null, "Libellé"), /*#__PURE__*/React.createElement("th", null, "Compte"), /*#__PURE__*/React.createElement("th", {
     className: "text-right"
-  }, "Montant"))), /*#__PURE__*/React.createElement("tbody", null, txns.map(t => {
+  }, "Montant"), /*#__PURE__*/React.createElement("th", null))), /*#__PURE__*/React.createElement("tbody", null, txns.map(t => {
     const acc = accounts.find(a => a.id === t.accountId);
     return /*#__PURE__*/React.createElement("tr", {
       key: t.id,
@@ -2602,13 +2685,25 @@ function Bank({
       className: "py-2"
     }, t.date), /*#__PURE__*/React.createElement("td", null, t.label), /*#__PURE__*/React.createElement("td", null, acc?.name), /*#__PURE__*/React.createElement("td", {
       className: `text-right font-semibold ${t.type === "credit" ? "text-emerald-700" : "text-red-700"}`
-    }, t.type === "credit" ? "+" : "-", cfa(t.amount)));
+    }, t.type === "credit" ? "+" : "-", cfa(t.amount)), /*#__PURE__*/React.createElement("td", {
+      className: "text-right"
+    }, /*#__PURE__*/React.createElement("button", {
+      onClick: () => deleteTxn(t.id),
+      className: "text-stone-400 hover:text-red-700 text-xs font-medium"
+    }, "Supprimer")));
   })))))), accModal && /*#__PURE__*/React.createElement(Modal, {
     title: "Nouveau compte",
     onClose: () => setAccModal(false)
   }, /*#__PURE__*/React.createElement(AccountForm, {
     onSave: addAccount,
     onCancel: () => setAccModal(false)
+  })), editAccountModal && /*#__PURE__*/React.createElement(Modal, {
+    title: "Modifier le compte",
+    onClose: () => setEditAccountModal(null)
+  }, /*#__PURE__*/React.createElement(AccountForm, {
+    account: editAccountModal,
+    onSave: updateAccount,
+    onCancel: () => setEditAccountModal(null)
   })), txnModal && /*#__PURE__*/React.createElement(Modal, {
     title: "Nouvelle écriture bancaire",
     onClose: () => setTxnModal(false)
@@ -2619,11 +2714,12 @@ function Bank({
   })));
 }
 function AccountForm({
+  account,
   onSave,
   onCancel
 }) {
-  const [name, setName] = useState("");
-  const [initial, setInitial] = useState(0);
+  const [name, setName] = useState(account?.name || "");
+  const [initial, setInitial] = useState(account?.initial ?? 0);
   return /*#__PURE__*/React.createElement("form", {
     onSubmit: e => {
       e.preventDefault();
@@ -2649,7 +2745,7 @@ function AccountForm({
     onClick: onCancel
   }, "Annuler"), /*#__PURE__*/React.createElement(Btn, {
     type: "submit"
-  }, "Créer")));
+  }, account ? "Enregistrer" : "Créer")));
 }
 function TxnForm({
   accounts,
@@ -2953,19 +3049,20 @@ function InvoiceForm({
   setCustomers,
   products,
   accounts,
+  invoice,
   onSave,
   onCancel
 }) {
-  const [customerId, setCustomerId] = useState("");
+  const [customerId, setCustomerId] = useState(invoice?.customerId || "");
   const [newCustomer, setNewCustomer] = useState(false);
-  const [customerName, setCustomerName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [dueDate, setDueDate] = useState(today());
-  const [notes, setNotes] = useState("");
+  const [customerName, setCustomerName] = useState(invoice?.customerId ? "" : invoice?.customerName || "");
+  const [phone, setPhone] = useState(invoice?.phone || "");
+  const [address, setAddress] = useState(invoice?.address || "");
+  const [dueDate, setDueDate] = useState(invoice?.dueDate || today());
+  const [notes, setNotes] = useState(invoice?.notes || "");
   const [paid, setPaid] = useState(false);
   const [accountId, setAccountId] = useState(accounts[0]?.id || "");
-  const [items, setItems] = useState([{
+  const [items, setItems] = useState(invoice?.items || [{
     label: "",
     qty: 1,
     unitPrice: 0
@@ -3030,7 +3127,7 @@ function InvoiceForm({
     value: notes,
     onChange: e => setNotes(e.target.value),
     placeholder: "Ex : facture pour prestation de service"
-  })), /*#__PURE__*/React.createElement("div", {
+  })), !invoice && /*#__PURE__*/React.createElement("div", {
     className: "flex items-center justify-between mt-2"
   }, /*#__PURE__*/React.createElement("label", {
     className: "flex items-center gap-2 text-sm"
@@ -3053,7 +3150,7 @@ function InvoiceForm({
   }, "Annuler"), /*#__PURE__*/React.createElement(Btn, {
     type: "submit",
     disabled: !items.some(it => it.label && Number(it.qty) > 0)
-  }, "Créer la facture")));
+  }, invoice ? "Enregistrer les modifications" : "Créer la facture")));
 }
 function MarkPaidForm({
   invoice,
@@ -3101,6 +3198,7 @@ function Billing({
   const [subTab, setSubTab] = useState("quotes");
   const [quoteModal, setQuoteModal] = useState(false);
   const [invoiceModal, setInvoiceModal] = useState(false);
+  const [editInvoice, setEditInvoice] = useState(null);
   const [payModal, setPayModal] = useState(null);
   const [pdfBusy, setPdfBusy] = useState(null);
   const createQuote = data => {
@@ -3108,7 +3206,7 @@ function Billing({
     setQuotes(prev => [{
       ...data,
       id,
-      number: `DEV-${id.slice(-6).toUpperCase()}`,
+      number: `DEV-${String(quotes.length + 1).padStart(4, "0")}`,
       date: today(),
       status: "draft",
       createdBy: currentUser?.name
@@ -3119,11 +3217,17 @@ function Billing({
     ...q,
     status
   } : q));
+  const deleteQuote = id => {
+    if (confirm("Supprimer ce devis ?")) setQuotes(prev => prev.filter(q => q.id !== id));
+  };
+  const deleteInvoice = id => {
+    if (confirm("Supprimer cette facture ? Cette action est irréversible.")) setInvoices(prev => prev.filter(i => i.id !== id));
+  };
   const convertToInvoice = quote => {
     const id = uid();
     const invoice = {
       id,
-      number: `FAC-${id.slice(-6).toUpperCase()}`,
+      number: `FAC-${String(invoices.length + 1).padStart(4, "0")}`,
       customerId: quote.customerId,
       customerName: quote.customerName,
       phone: quote.phone,
@@ -3149,7 +3253,7 @@ function Billing({
     const id = uid();
     setInvoices(prev => [{
       id,
-      number: `FAC-${id.slice(-6).toUpperCase()}`,
+      number: `FAC-${String(invoices.length + 1).padStart(4, "0")}`,
       customerId: data.customerId,
       customerName: data.customerName,
       phone: data.phone,
@@ -3165,6 +3269,20 @@ function Billing({
     }, ...prev]);
     if (data.paid && data.accountId) addTxn(data.accountId, "credit", data.total, `Facture — ${data.customerName}`, id);
     setInvoiceModal(false);
+  };
+  const updateInvoice = data => {
+    setInvoices(prev => prev.map(i => i.id === editInvoice.id ? {
+      ...i,
+      customerId: data.customerId,
+      customerName: data.customerName,
+      phone: data.phone,
+      address: data.address,
+      dueDate: data.dueDate,
+      items: data.items,
+      total: data.total,
+      notes: data.notes
+    } : i));
+    setEditInvoice(null);
   };
   const markPaid = accountId => {
     setInvoices(prev => prev.map(i => i.id === payModal.id ? {
@@ -3270,7 +3388,10 @@ function Billing({
     onClick: () => convertToInvoice(q)
   }, /*#__PURE__*/React.createElement(ArrowRightCircle, {
     size: 14
-  }), " Convertir en facture"))))))))), subTab === "invoices" && /*#__PURE__*/React.createElement(Card, null, invoices.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
+  }), " Convertir en facture"), /*#__PURE__*/React.createElement(Btn, {
+    variant: "danger",
+    onClick: () => deleteQuote(q.id)
+  }, "Supprimer"))))))))), subTab === "invoices" && /*#__PURE__*/React.createElement(Card, null, invoices.length === 0 ? /*#__PURE__*/React.createElement(Empty, {
     text: "Aucune facture",
     icon: FileText
   }) : /*#__PURE__*/React.createElement("div", {
@@ -3318,6 +3439,11 @@ function Billing({
       className: "flex gap-1.5 justify-end"
     }, /*#__PURE__*/React.createElement(Btn, {
       variant: "ghost",
+      onClick: () => setEditInvoice(inv)
+    }, /*#__PURE__*/React.createElement(Pencil, {
+      size: 14
+    }), " Modifier"), /*#__PURE__*/React.createElement(Btn, {
+      variant: "ghost",
       disabled: pdfBusy === inv.id,
       onClick: () => downloadPdf("facture", inv)
     }, /*#__PURE__*/React.createElement(FileText, {
@@ -3326,7 +3452,10 @@ function Billing({
       onClick: () => setPayModal(inv)
     }, /*#__PURE__*/React.createElement(CheckCircle2, {
       size: 14
-    }), " Marquer payée"))));
+    }), " Marquer payée"), currentUser.role === "admin" && /*#__PURE__*/React.createElement(Btn, {
+      variant: "danger",
+      onClick: () => deleteInvoice(inv.id)
+    }, "Supprimer"))));
   }))))), quoteModal && /*#__PURE__*/React.createElement(Modal, {
     title: "Nouveau devis / proposition de service",
     onClose: () => setQuoteModal(false),
@@ -3348,6 +3477,18 @@ function Billing({
     accounts: accounts,
     onSave: createInvoice,
     onCancel: () => setInvoiceModal(false)
+  })), editInvoice && /*#__PURE__*/React.createElement(Modal, {
+    title: "Modifier la facture",
+    onClose: () => setEditInvoice(null),
+    wide: true
+  }, /*#__PURE__*/React.createElement(InvoiceForm, {
+    customers: customers,
+    setCustomers: setCustomers,
+    products: products,
+    accounts: accounts,
+    invoice: editInvoice,
+    onSave: updateInvoice,
+    onCancel: () => setEditInvoice(null)
   })), payModal && /*#__PURE__*/React.createElement(Modal, {
     title: "Encaisser la facture",
     onClose: () => setPayModal(null)
